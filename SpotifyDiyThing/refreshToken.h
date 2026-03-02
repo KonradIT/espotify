@@ -10,7 +10,7 @@ SpotifyArduino *spotify_refresh;
 
 #ifdef USE_IP_ADDRESS
 char callbackURItemplate[] = "%s%s%s";
-char callbackURIProtocol[] = "http%3A%2F%2F"; // "http://"
+char callbackURIProtocol[] = "https%3A%2F%2F"; // "http://"
 char callbackURIAddress[] = "%2Fcallback%2F"; // "/callback/"
 char callbackURI[100];
 #else

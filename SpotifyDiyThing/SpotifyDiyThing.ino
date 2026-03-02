@@ -12,20 +12,25 @@
 // ---------------------------
 
 // This project currently supports the following displays
-// (Uncomment the required #define)
+// (Uncomment the required #define, or set via build flags in platformio.ini)
 
-// 1. Cheap yellow display (Using TFT-eSPI library)
+// 1. Cheap Yellow Display / CYD (320×240 TFT with touchscreen, ILI9341)
 // #define YELLOW_DISPLAY
 
-// 2. Matrix Displays (Like the ESP32 Trinity)
+// 2. TTGO T-Display (135×240 ST7789V, two physical buttons)
+// #define TTGO_TDISPLAY
+
+// 3. Matrix Displays (Like the ESP32 Trinity)
 // #define MATRIX_DISPLAY
 
-// If no defines are set, it will default to CYD
-#if !defined(YELLOW_DISPLAY) && !defined(MATRIX_DISPLAY)
-#define YELLOW_DISPLAY // Default to Yellow Display for display type
+// If no display is specified, default to CYD
+#if !defined(YELLOW_DISPLAY) && !defined(MATRIX_DISPLAY) && !defined(TTGO_TDISPLAY)
+#define YELLOW_DISPLAY
 #endif
 
-#define NFC_ENABLED 1
+// NFC_ENABLED is set per-environment via build flags in platformio.ini.
+// When building outside PlatformIO, uncomment the line below to enable NFC:
+// #define NFC_ENABLED 1
 
 // This causes issues in certain circumstances e.g. Play an album and let it auto play to related songs
 bool writeContextToNfc = true;
@@ -96,13 +101,20 @@ WiFiClientSecure client;
 // Display Handling Code
 // ----------------------------
 
-#if defined YELLOW_DISPLAY
+#if defined TTGO_TDISPLAY
+
+#include "ttgoDisplay.h"
+TTGODisplay ttgoDisplay;
+SpotifyDisplay *spotifyDisplay = &ttgoDisplay;
+
+#elif defined YELLOW_DISPLAY
 
 #include "cheapYellowLCD.h"
 CheapYellowDisplay cyd;
 SpotifyDisplay *spotifyDisplay = &cyd;
 
 #elif defined MATRIX_DISPLAY
+
 #include "matrixDisplay.h"
 MatrixDisplay matrixDisplay;
 SpotifyDisplay *spotifyDisplay = &matrixDisplay;
