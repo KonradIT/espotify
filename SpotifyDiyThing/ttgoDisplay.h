@@ -59,6 +59,7 @@ static bool s_nextTriggered = false;
 #define TEXT_X       (IMG_SIZE + 10)
 #define PROG_BAR_Y   (135 - 14)
 #define PROG_BAR_H   10
+#define PROG_BAR_MARGIN 6   // left/right margin so bar isn't cropped at edge
 
 class TTGODisplay : public SpotifyDisplay
 {
@@ -94,10 +95,12 @@ public:
   void displayTrackProgress(long progress, long duration)
   {
     if (duration == 0) return;
-    int barW = map(progress, 0, duration, 0, screenWidth - 10);
-    _lcd.drawRect(4, PROG_BAR_Y, screenWidth - 8, PROG_BAR_H, TFT_WHITE);
-    _lcd.fillRect(5, PROG_BAR_Y + 1, barW, PROG_BAR_H - 2, TFT_WHITE);
-    _lcd.fillRect(5 + barW, PROG_BAR_Y + 1, (screenWidth - 9) - barW, PROG_BAR_H - 2, TFT_BLACK);
+    int barTotalW = screenWidth - (2 * PROG_BAR_MARGIN);
+    int innerW = barTotalW - 2;  // inside 1px border each side
+    int barW = map(progress, 0, duration, 0, innerW);
+    _lcd.drawRect(PROG_BAR_MARGIN, PROG_BAR_Y, barTotalW, PROG_BAR_H, TFT_WHITE);
+    _lcd.fillRect(PROG_BAR_MARGIN + 1, PROG_BAR_Y + 1, barW, PROG_BAR_H - 2, TFT_WHITE);
+    _lcd.fillRect(PROG_BAR_MARGIN + 1 + barW, PROG_BAR_Y + 1, innerW - barW, PROG_BAR_H - 2, TFT_BLACK);
   }
 
   void printCurrentlyPlayingToScreen(CurrentlyPlaying currentlyPlaying)
