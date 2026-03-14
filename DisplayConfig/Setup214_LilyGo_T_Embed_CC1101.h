@@ -12,7 +12,7 @@
 #define TFT_WIDTH 170
 #define TFT_HEIGHT 320
 
-#define TFT_INVERSION_OFF
+#define TFT_INVERSION_ON
 
 #define TFT_BL 21
 #define TFT_BACKLIGHT_ON HIGH
