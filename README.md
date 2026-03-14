@@ -172,6 +172,8 @@ In the [platformio.ini](platformio.ini), there are several environments defined 
 | env:cyd     | For the [Cheap Yellow Display](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display)                                   |
 | env:cyd2usb | For the Cheap Yellow Display with two USB ports                                                                              |
 | env:trinity | For the [ESP32 Trinity](https://github.com/witnessmenow/ESP32-Trinity) (or generic ESP32 wired to the matrix panel the same) |
+| env:ttgo-t-display | For the TTGO T-Display (135×240 ST7789, two buttons)                                                                   |
+| env:t-embed-s3-cc1101 | For the LILYGO T-Embed S3 CC1101 (170×320 ST7789, rotary encoder: rotate L=prev, R=next) |
 
 When you select the environment, it will automatically install the right libraries and set the configurations in the code.
 
