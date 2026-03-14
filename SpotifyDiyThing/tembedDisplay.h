@@ -149,7 +149,6 @@ public:
     s_ledRing.setBrightness(TEMBED_LED_BRIGHTNESS);
     s_ledInitialized = true;
     s_lastLedPlaying = !spotifyIsPlaying;  // force first update in checkForInput
-    _lcd.invertDisplay(true);   // keep correct colors (TFT_INVERSION_ON) after LED pin is active
   }
 
   void showDefaultScreen()
@@ -280,7 +279,6 @@ public:
       for (int i = 0; i < s_ledRing.numPixels(); i++)
         s_ledRing.setPixelColor(i, c);
       s_ledRing.show();
-      _lcd.invertDisplay(true);   // re-apply in case LED update disturbed display
     }
   }
 
