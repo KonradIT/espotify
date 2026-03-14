@@ -23,8 +23,11 @@
 // 3. Matrix Displays (Like the ESP32 Trinity)
 // #define MATRIX_DISPLAY
 
+// 4. LILYGO T-Embed S3 CC1101 (170×320 ST7789, rotary encoder: L=prev, R=next)
+// #define TEMBED_DISPLAY
+
 // If no display is specified, default to CYD
-#if !defined(YELLOW_DISPLAY) && !defined(MATRIX_DISPLAY) && !defined(TTGO_TDISPLAY)
+#if !defined(YELLOW_DISPLAY) && !defined(MATRIX_DISPLAY) && !defined(TTGO_TDISPLAY) && !defined(TEMBED_DISPLAY)
 #define YELLOW_DISPLAY
 #endif
 
@@ -107,6 +110,12 @@ WiFiClientSecure client;
 TTGODisplay ttgoDisplay;
 SpotifyDisplay *spotifyDisplay = &ttgoDisplay;
 
+#elif defined TEMBED_DISPLAY
+
+#include "tembedDisplay.h"
+TEmbedDisplay tembedDisplay;
+SpotifyDisplay *spotifyDisplay = &tembedDisplay;
+
 #elif defined YELLOW_DISPLAY
 
 #include "cheapYellowLCD.h"
@@ -135,6 +144,17 @@ void setup()
 {
   Serial.begin(115200);
 
+  // Initialise SPIFFS first: DoubleResetDetector (when ESP_DRD_USE_SPIFFS) and
+  // fetchConfigFile both need it. Must run before drd->detectDoubleReset().
+  bool spiffsInitSuccess = SPIFFS.begin(false) || SPIFFS.begin(true);
+  if (!spiffsInitSuccess)
+  {
+    Serial.println("SPIFFS initialisation failed!");
+    while (1)
+      yield(); // Stay here twiddling thumbs waiting
+  }
+  Serial.println("SPIFFS OK.");
+
   bool forceConfig = false;
 
   drd = new DoubleResetDetector(DRD_TIMEOUT, DRD_ADDRESS);
@@ -157,19 +177,7 @@ void setup()
   }
 #endif
 
-  // Initialise SPIFFS, if this fails try .begin(true)
-  // NOTE: I believe this formats it though it will erase everything on
-  // spiffs already! In this example that is not a problem.
-  // I have found once I used the true flag once, I could use it
-  // without the true flag after that.
-  bool spiffsInitSuccess = SPIFFS.begin(false) || SPIFFS.begin(true);
-  if (!spiffsInitSuccess)
-  {
-    Serial.println("SPIFFS initialisation failed!");
-    while (1)
-      yield(); // Stay here twiddling thumbs waiting
-  }
-  Serial.println("\r\nInitialisation done.");
+  Serial.println("Initialisation done.");
 
   refreshToken[0] = '\0';
   if (!fetchConfigFile(refreshToken, clientId, clientSecret))

@@ -18,6 +18,36 @@ unsigned long requestDueTime;              // time when request due
 unsigned long delayBetweenProgressUpdates = 500; // Time between requests (0.5 seconds)
 unsigned long progressDueTime;                   // time when request due
 
+bool spotifyIsPlaying = false;  // last known play state (for play/pause toggle from T-Embed button etc.)
+
+static CurrentlyPlaying s_lastCurrentlyPlaying;
+static char s_lastTrackName[200];
+static char s_lastArtistName[150];
+static char s_lastAlbumName[150];
+
+static void copyCurrentlyPlayingForRedraw(CurrentlyPlaying &dest, const CurrentlyPlaying &src)
+{
+  dest = src;
+  if (src.trackName)
+  {
+    strncpy(s_lastTrackName, src.trackName, sizeof(s_lastTrackName) - 1);
+    s_lastTrackName[sizeof(s_lastTrackName) - 1] = '\0';
+    dest.trackName = s_lastTrackName;
+  }
+  if (src.albumName)
+  {
+    strncpy(s_lastAlbumName, src.albumName, sizeof(s_lastAlbumName) - 1);
+    s_lastAlbumName[sizeof(s_lastAlbumName) - 1] = '\0';
+    dest.albumName = s_lastAlbumName;
+  }
+  if (src.numArtists > 0 && src.artists[0].artistName)
+  {
+    strncpy(s_lastArtistName, src.artists[0].artistName, sizeof(s_lastArtistName) - 1);
+    s_lastArtistName[sizeof(s_lastArtistName) - 1] = '\0';
+    dest.artists[0].artistName = s_lastArtistName;
+  }
+}
+
 void spotifySetup(SpotifyDisplay *theDisplay, const char *clientId, const char *clientSecret)
 {
   sp_Display = theDisplay;
@@ -69,6 +99,7 @@ void handleCurrentlyPlaying(CurrentlyPlaying currentlyPlaying)
 {
   if (currentlyPlaying.trackUri != NULL)
   {
+    copyCurrentlyPlayingForRedraw(s_lastCurrentlyPlaying, currentlyPlaying);
     if (!isSameTrack(currentlyPlaying.trackUri))
     {
       setTrackUri(currentlyPlaying.trackUri);
@@ -82,6 +113,7 @@ void handleCurrentlyPlaying(CurrentlyPlaying currentlyPlaying)
 
     sp_Display->displayTrackProgress(currentlyPlaying.progressMs, currentlyPlaying.durationMs);
 
+    spotifyIsPlaying = currentlyPlaying.isPlaying;
     if (currentlyPlaying.isPlaying)
     {
       // If we know at what millis the song started at, we can make a good guess
@@ -136,6 +168,9 @@ void updateCurrentlyPlaying(boolean forceUpdate)
         if (displayImageResult)
         {
           albumArtChanged = false;
+          // Redraw text on top of new accent background (drawImageFromFile fills the text area)
+          if (s_lastCurrentlyPlaying.trackUri != NULL)
+            sp_Display->printCurrentlyPlayingToScreen(s_lastCurrentlyPlaying);
         }
         else
         {
