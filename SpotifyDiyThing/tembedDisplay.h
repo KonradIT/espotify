@@ -7,6 +7,7 @@
 #include <TFT_eSPI.h>
 #include <RotaryEncoder.h>
 #include <JPEGDEC.h>
+#include <Adafruit_NeoPixel.h>
 
 TFT_eSPI _lcd = TFT_eSPI();
 JPEGDEC jpeg;
@@ -17,16 +18,31 @@ const char *ALBUM_ART = "/album.jpg";
 #define TEMBED_ENCODER_A 4
 #define TEMBED_ENCODER_B 5
 #define TEMBED_BTN_PLAYPAUSE 0  // encoder key (LILYGO ENCODER_KEY)
+#define TEMBED_BTN_SEEK       6  // secondary button: hold to scrub with encoder
+#define TEMBED_LED_PIN       14  // WS2812 RGB LED ring around encoder
+#define TEMBED_LED_COUNT      8  // number of LEDs in ring (adjust if different)
 
 RotaryEncoder encoder(TEMBED_ENCODER_A, TEMBED_ENCODER_B, RotaryEncoder::LatchMode::FOUR3);
 
 extern bool spotifyIsPlaying;
+extern long songStartMillis;
+extern long songDuration;
 
 static bool s_prevTriggered = false;
 static bool s_nextTriggered = false;
 static bool s_playPauseTriggered = false;
 static uint32_t s_lastBtnMs = 0;
 static bool s_lastBtnState = true;  // HIGH = not pressed (pull-up)
+
+// Seek (scrub) mode: hold TEMBED_BTN_SEEK, then encoder changes position
+static bool s_seekWasHeld = false;
+static long s_scrubPositionMs = 0;
+static const long SEEK_STEP_MS = 10000;  // 10 seconds per encoder tick
+
+// WS2812 LED ring: green = playing, blue = paused
+static Adafruit_NeoPixel s_ledRing(TEMBED_LED_COUNT, TEMBED_LED_PIN, NEO_GRB + NEO_KHZ800);
+static bool s_lastLedPlaying = false;
+static bool s_ledInitialized = false;
 
 // Accent color: sampled during decode (RGB565 → accumulated R,G,B)
 static uint32_t s_accR = 0, s_accG = 0, s_accB = 0;
@@ -125,6 +141,14 @@ public:
     encoder.setPosition(0);
 
     pinMode(TEMBED_BTN_PLAYPAUSE, INPUT_PULLUP);
+    pinMode(TEMBED_BTN_SEEK, INPUT_PULLUP);
+
+    // LED ring init last: driving GPIO 14 can affect display inversion on this board,
+    // so we re-apply correct inversion after NeoPixel begin()
+    s_ledRing.begin();
+    s_ledRing.setBrightness(TEMBED_LED_BRIGHTNESS);
+    s_ledInitialized = true;
+    s_lastLedPlaying = !spotifyIsPlaying;  // force first update in checkForInput
   }
 
   void showDefaultScreen()
@@ -159,12 +183,39 @@ public:
   void checkForInput()
   {
     encoder.tick();
-    // getDirection(): DIR_CW = 1 (next), DIR_CCW = -1 (prev)
     int dir = (int)encoder.getDirection();
-    if (dir < 0)
-      s_nextTriggered = true;
-    else if (dir > 0)
-      s_prevTriggered = true;
+    bool seekHeld = (digitalRead(TEMBED_BTN_SEEK) == LOW);
+
+    // When seek button is held: encoder scrubs position instead of changing track
+    if (seekHeld && songStartMillis != 0 && songDuration > 0)
+    {
+      if (!s_seekWasHeld)
+      {
+        s_scrubPositionMs = (long)(millis() - songStartMillis);
+        if (s_scrubPositionMs < 0) s_scrubPositionMs = 0;
+        if (s_scrubPositionMs > songDuration) s_scrubPositionMs = songDuration;
+        s_seekWasHeld = true;
+      }
+      if (dir != 0)
+      {
+        s_scrubPositionMs -= (long)dir * SEEK_STEP_MS;
+        if (s_scrubPositionMs < 0) s_scrubPositionMs = 0;
+        if (s_scrubPositionMs > songDuration) s_scrubPositionMs = songDuration;
+        spotify_display->seek((int)s_scrubPositionMs);
+        songStartMillis = millis() - s_scrubPositionMs;
+        requestDueTime = 0;
+        displayTrackProgress(s_scrubPositionMs, songDuration);
+      }
+    }
+    else
+    {
+      s_seekWasHeld = false;
+      // getDirection(): DIR_CW = 1 (next), DIR_CCW = -1 (prev)
+      if (dir < 0)
+        s_nextTriggered = true;
+      else if (dir > 0)
+        s_prevTriggered = true;
+    }
 
     // Play/pause button (encoder key): active LOW, debounced
     bool btn = (digitalRead(TEMBED_BTN_PLAYPAUSE) == LOW);
@@ -218,6 +269,16 @@ public:
       Serial.println(result);
       spotifyIsPlaying = !spotifyIsPlaying;  // toggle until next API state
       requestDueTime = 0;
+    }
+
+    // LED ring: green when playing, blue when paused (update only when state changes)
+    if (s_ledInitialized && s_lastLedPlaying != spotifyIsPlaying)
+    {
+      s_lastLedPlaying = spotifyIsPlaying;
+      uint32_t c = spotifyIsPlaying ? s_ledRing.Color(0, 255, 0) : s_ledRing.Color(0, 0, 255);
+      for (int i = 0; i < s_ledRing.numPixels(); i++)
+        s_ledRing.setPixelColor(i, c);
+      s_ledRing.show();
     }
   }
 
