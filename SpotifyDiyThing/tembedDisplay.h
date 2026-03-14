@@ -146,7 +146,7 @@ public:
     // LED ring init last: driving GPIO 14 can affect display inversion on this board,
     // so we re-apply correct inversion after NeoPixel begin()
     s_ledRing.begin();
-    s_ledRing.setBrightness(40);
+    s_ledRing.setBrightness(TEMBED_LED_BRIGHTNESS);
     s_ledInitialized = true;
     s_lastLedPlaying = !spotifyIsPlaying;  // force first update in checkForInput
     _lcd.invertDisplay(true);   // keep correct colors (TFT_INVERSION_ON) after LED pin is active
