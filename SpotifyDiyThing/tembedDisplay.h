@@ -16,11 +16,17 @@ const char *ALBUM_ART = "/album.jpg";
 // Rotary encoder: official T-Embed CC1101 uses GPIO 4 (A) and 5 (B) — do NOT use 27/28 (flash/PSRAM)
 #define TEMBED_ENCODER_A 4
 #define TEMBED_ENCODER_B 5
+#define TEMBED_BTN_PLAYPAUSE 0  // encoder key (LILYGO ENCODER_KEY)
 
 RotaryEncoder encoder(TEMBED_ENCODER_A, TEMBED_ENCODER_B, RotaryEncoder::LatchMode::FOUR3);
 
+extern bool spotifyIsPlaying;
+
 static bool s_prevTriggered = false;
 static bool s_nextTriggered = false;
+static bool s_playPauseTriggered = false;
+static uint32_t s_lastBtnMs = 0;
+static bool s_lastBtnState = true;  // HIGH = not pressed (pull-up)
 
 // Accent color: sampled during decode (RGB565 → accumulated R,G,B)
 static uint32_t s_accR = 0, s_accG = 0, s_accB = 0;
@@ -117,6 +123,8 @@ public:
     _lcd.setRotation(3);   // 3 = flipped 180° (270° from portrait)
     _lcd.fillScreen(TFT_BLACK);
     encoder.setPosition(0);
+
+    pinMode(TEMBED_BTN_PLAYPAUSE, INPUT_PULLUP);
   }
 
   void showDefaultScreen()
@@ -158,6 +166,20 @@ public:
     else if (dir > 0)
       s_prevTriggered = true;
 
+    // Play/pause button (encoder key): active LOW, debounced
+    bool btn = (digitalRead(TEMBED_BTN_PLAYPAUSE) == LOW);
+    uint32_t now = millis();
+    if (btn != s_lastBtnState)
+    {
+      if (now - s_lastBtnMs > 40)
+      {
+        s_lastBtnState = btn;
+        s_lastBtnMs = now;
+        if (btn)
+          s_playPauseTriggered = true;
+      }
+    }
+
     if (s_prevTriggered)
     {
       s_prevTriggered = false;
@@ -176,6 +198,25 @@ public:
       int result = spotify_display->nextTrack();
       Serial.print("nextTrack HTTP: ");
       Serial.println(result);
+      requestDueTime = 0;
+    }
+    if (s_playPauseTriggered)
+    {
+      s_playPauseTriggered = false;
+      int result;
+      if (spotifyIsPlaying)
+      {
+        Serial.println("BTN: pause");
+        result = spotify_display->pause();
+      }
+      else
+      {
+        Serial.println("BTN: play");
+        result = spotify_display->play();
+      }
+      Serial.print("playback HTTP: ");
+      Serial.println(result);
+      spotifyIsPlaying = !spotifyIsPlaying;  // toggle until next API state
       requestDueTime = 0;
     }
   }

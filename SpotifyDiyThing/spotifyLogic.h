@@ -18,6 +18,8 @@ unsigned long requestDueTime;              // time when request due
 unsigned long delayBetweenProgressUpdates = 500; // Time between requests (0.5 seconds)
 unsigned long progressDueTime;                   // time when request due
 
+bool spotifyIsPlaying = false;  // last known play state (for play/pause toggle from T-Embed button etc.)
+
 static CurrentlyPlaying s_lastCurrentlyPlaying;
 static char s_lastTrackName[200];
 static char s_lastArtistName[150];
@@ -111,6 +113,7 @@ void handleCurrentlyPlaying(CurrentlyPlaying currentlyPlaying)
 
     sp_Display->displayTrackProgress(currentlyPlaying.progressMs, currentlyPlaying.durationMs);
 
+    spotifyIsPlaying = currentlyPlaying.isPlaying;
     if (currentlyPlaying.isPlaying)
     {
       // If we know at what millis the song started at, we can make a good guess
