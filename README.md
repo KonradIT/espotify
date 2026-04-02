@@ -11,7 +11,7 @@ Aside from the CYD screens, the project now supports the following hardware:
 - rotary encoder: twist left = previous song, twist right = next song
 - WS2812 RGB LED ring around encoder, blue = `paused`, green = `playing`
 
-![](https://i.imgur.com/XsLbqqb.gif)
+![](https://i.imgur.com/nRvfxHs.gif)
 
 **TTGO T-Display**:
 - 135x240 ST7789V, two physical buttons
