@@ -1,22 +1,24 @@
-# Spotify-Diy-Thing
+# ESPotify
 
-Something similar to the [Spotify Car Thing](https://carthing.spotify.com/), built with a cheap ESP32 Screen. Connects to your Spotify account and displays your currently playing song with its album art
+Konrad's fork of the [Spotify-Diy-Thing](https://github.com/witnessmenow/Spotify-Diy-Thing) project.    
 
-![image](https://user-images.githubusercontent.com/1562562/221344692-7dd359d3-2e64-4a09-850b-b619477c5043.png)
+Aside from the CYD screens, the project now supports the following hardware:
 
-This project is a Work in Progress!
+### New hardware supported:
 
-## Help Support what I do!
+**Lilygo T-Embed S3 CC1101**:
+- 170x320 ST7789, 
+- rotary encoder: twist left = previous song, twist right = next song
+- WS2812 RGB LED ring around encoder, blue = `paused`, green = `playing`
 
-[If you enjoy my work, please consider becoming a Github sponsor!](https://github.com/sponsors/witnessmenow/)
+![](https://i.imgur.com/XsLbqqb.gif)
 
-## Hardware Required
+**TTGO T-Display**:
+- 135x240 ST7789V, two physical buttons
 
-This project is designed to make use of basically ready to go hardware, so is very easy to get up and running
+## Existing supported hardware:
 
-Currently this project runs on two types of hardware:
-
-### "Cheap Yellow Display" (CYD)
+**"Cheap Yellow Display" (CYD)**:
 
 An ESP32 With Built in 320x240 LCD with Touch Screen (ESP32-2432S028R), buy from wherever works out cheapest for you:
 
@@ -25,7 +27,7 @@ An ESP32 With Built in 320x240 LCD with Touch Screen (ESP32-2432S028R), buy from
 - [Aliexpress](https://www.aliexpress.com/item/1005004502250619.htm)
 - [Makerfabs](https://www.makerfabs.com/sunton-esp32-2-8-inch-tft-with-touch.html)
 
-### Matrix panel (ESP32 Trinity)
+**Matrix panel (ESP32 Trinity)**:
 
 It's built to work with the [ESP32 Trinity](https://github.com/witnessmenow/ESP32-Trinity), an open source board I created for controlling Hub75 Matrix panels, but it will does work with any ESP32 that breaks out enough pins.
 
@@ -43,67 +45,6 @@ All the parts can be purchased from Makerfabs.com:
 
 I've tried to design this project to be modular and have abstracted the display code behind an interface, so it should be pretty easy to get it up and running with a different type of display.
 
-## NFC Tags (Optional)
-
-One of the coolest parts about this project, in my opinion at least, is the ability to connect an NFC reader to control what songs/albums/playlists are being played.
-
-You can write the spotify URI or URL of the song, album or playlist to an NFC tag and when you swipe it off the reader, the device will tell your spotify account to play what it reads.
-
-If you aren't interested in this feature, you can just not connect it and the device will work without it.
-
-### PN532 NFC reader and Tags
-
-This code has been tested with these red PN532 NFC readers and cheap NFC stickers.
-
-To use the PN532 as an SPI device, you need to configure the toggle switches so switch 1 is down and 2 is up. (You may need to remove the sticker on top of it)
-
-#### Links
-
-- [PN532 NFC reader - Aliexpress\*](https://s.click.aliexpress.com/e/_DCanbAB)
-- [NFC Stickers - Aliexpress\*](https://s.click.aliexpress.com/e/_DkX2F5z)
-
-### Hardware support
-
-#### "Cheap Yellow Display" (CYD)
-
-The CYD does not have enough free pins to use an SPI device by default, and the NFC reader is quite slow over i2c, so we need to get creative.
-
-With the help of an "SD Card Sniffer", we can make use of the Micro SD slot of the CYD to connect the NFC reader to.
-
-##### Connections
-
-| Sniffer Board Label | ESP32 Pin | PN532 NFC |
-| ------------------- | --------- | --------- |
-| DAT2                | -         | -         |
-| CD                  | IO5       | CS        |
-| CMD                 | IO23      | DI / MOSI |
-| GND                 | GND       | GND       |
-| VCC                 | 3.3V      | VCC       |
-| CLK                 | IO18      | SCLK      |
-| DAT0                | IO19      | DO / MISO |
-| DAT1                | -         | -         |
-
-#### Links
-
-- [Micro SD Card Sniffer - Aliexpress\*](https://s.click.aliexpress.com/e/_Ddwcy9h)
-
-#### Matrix Panel (ESP32 Trinity)
-
-Again, it is designed for the ESP32 Trinity, but can work with any ESP32 that breaks out the required pins.
-
-The Trinity has some pins broken out that can be used for this purpose
-
-#### Connections
-
-| ESP32 Pin  | PN532 NFC |
-| ---------- | --------- |
-| IO22 (SCL) | CS        |
-| IO21 (SDA) | DI / MOSI |
-| GND        | GND       |
-| 3.3V       | VCC       |
-| IO33       | SCLK      |
-| IO32       | DO / MISO |
-
 ## Project Setup
 
 These steps only need to be run once.
@@ -113,18 +54,15 @@ These steps only need to be run once.
 In order to use this project, you will need to create an application on the Spotify Developer Dashboard
 
 - Sign into the [Spotify Developer page](https://developer.spotify.com/dashboard/login)
-- Create a new application. (name it whatever you want). There is a section fo "callback URI" you can just make this "locahost" for now.
+- Create a new application. (name it whatever you want). 
+- There is a section fo "callback URI" you can just make this "locahost" for now.
 - You will need the "client ID" and "client secret" from this page later in the steps
-
-You will need to add a callback URI for authentication process by clicking "Edit Settings", what URI to use will be displayed on screen in a later step.
 
 ### Step 2 - Flash the Project
 
-Flash the project directly from your browser [here](https://witnessmenow.github.io/Spotify-Diy-Thing) (Chrome & Edge only)
+Clone the repository and open the project in vscode with platformio extension installed. Or use platormio cli to build and flash the project.
 
-or
-
-Jump to the "code" section below
+There are different platformio environments for the different hardware, make sure to select the correct one.
 
 ### Step 3 - Adding your Wifi and Spotify Details
 
@@ -132,8 +70,8 @@ The device is now flashed with the code, but it doesn't know what your Wifi or S
 
 In order to enter your wifi details, the project will host it's own wifi network. Connect to it using your phone.
 
-- SSID: SpotifyDiy
-- Password: thing123
+- SSID: `SpotifyDiy`
+- Password: `thing123`
 
 You should be automatically redirected to the config page.
 
@@ -151,9 +89,12 @@ The final step is to connect this device to your Spotify account. When the Wifi 
 
 - Your device will now be connected to the Wifi details you gave it.
 - Go to the address displayed on screen using your phone or PC that is connected to the same network as your device.
-- On the webpage that loads there will be an address displayed in bold, add this to the callback URI section as mentioned in the Spotify API section
+- On the webpage that loads there will be an address displayed in bold, 
+- **add this to the callback URI section**, make sure it has https://, the callback URL should be something like `https://192.168.0.XX/callback/`
 - Click the `Spotify Auth` URL
 - You will need to give permission to the app you created to have access to your spotify account
+- The redirect will fail, your browser will go to the https callback URL but because the ESP32 doesn't have HTTPS SSL certs enabled the browser will reject this
+- **REMOVE THE HTTPS FROM THE URL** and try again, this time it should work. Has to be http:// or just without any protocol prefix.
 
 Your project should now be setup and will start displaying your currently playing music!
 
