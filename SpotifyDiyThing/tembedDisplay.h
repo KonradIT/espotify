@@ -147,6 +147,7 @@ public:
     // so we re-apply correct inversion after NeoPixel begin()
     s_ledRing.begin();
     s_ledRing.setBrightness(TEMBED_LED_BRIGHTNESS);
+    _lcd.invertDisplay(true);  // re-apply inversion after NeoPixel init on GPIO 14
     s_ledInitialized = true;
     s_lastLedPlaying = !spotifyIsPlaying;  // force first update in checkForInput
   }
