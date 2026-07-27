@@ -366,6 +366,10 @@ private:
 
     client.setCACert(spotify_image_server_cert);
     bool gotImage = spotify_display->getImage(albumArtUrl, &f);
+    // WiFiClientSecure::connect() doesn't stop() a still-open session before
+    // reusing it, so without this a button press right after an image download
+    // can hit the API host mid-teardown and fail with "connection reset" (-80).
+    client.stop();
     client.setCACert(spotify_server_cert);
     f.close();
 

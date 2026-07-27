@@ -26,8 +26,11 @@
 // 4. LILYGO T-Embed S3 CC1101 (170×320 ST7789, rotary encoder: L=prev, R=next)
 // #define TEMBED_DISPLAY
 
+// 5. M5Stack Core Basic (320×240 ILI9341, buttons: A=prev, B=play/pause, C=next)
+// #define M5STACK_DISPLAY
+
 // If no display is specified, default to CYD
-#if !defined(YELLOW_DISPLAY) && !defined(MATRIX_DISPLAY) && !defined(TTGO_TDISPLAY) && !defined(TEMBED_DISPLAY)
+#if !defined(YELLOW_DISPLAY) && !defined(MATRIX_DISPLAY) && !defined(TTGO_TDISPLAY) && !defined(TEMBED_DISPLAY) && !defined(M5STACK_DISPLAY)
 #define YELLOW_DISPLAY
 #endif
 
@@ -115,6 +118,12 @@ SpotifyDisplay *spotifyDisplay = &ttgoDisplay;
 #include "tembedDisplay.h"
 TEmbedDisplay tembedDisplay;
 SpotifyDisplay *spotifyDisplay = &tembedDisplay;
+
+#elif defined M5STACK_DISPLAY
+
+#include "m5stackDisplay.h"
+M5StackDisplay m5stackDisplay;
+SpotifyDisplay *spotifyDisplay = &m5stackDisplay;
 
 #elif defined YELLOW_DISPLAY
 

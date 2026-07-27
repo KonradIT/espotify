@@ -16,6 +16,10 @@ Aside from the CYD screens, the project now supports the following hardware:
 **TTGO T-Display**:
 - 135x240 ST7789V, two physical buttons
 
+**M5Stack Core Basic (v2.7)**:
+- 320x240 ILI9341, layout adapted from the CYD
+- three physical buttons: A = previous, B = play/pause, C = next
+
 ## Existing supported hardware:
 
 **"Cheap Yellow Display" (CYD)**:
@@ -115,6 +119,7 @@ In the [platformio.ini](platformio.ini), there are several environments defined 
 | env:trinity | For the [ESP32 Trinity](https://github.com/witnessmenow/ESP32-Trinity) (or generic ESP32 wired to the matrix panel the same) |
 | env:ttgo-t-display | For the TTGO T-Display (135×240 ST7789, two buttons)                                                                   |
 | env:t-embed-s3-cc1101 | For the LILYGO T-Embed S3 CC1101 (170×320 ST7789, rotary encoder: rotate L=prev, R=next) |
+| env:m5stack-basic-v27 | For the M5Stack Core Basic v2.7 (320×240 ILI9341, buttons: A=prev, B=play/pause, C=next) |
 
 When you select the environment, it will automatically install the right libraries and set the configurations in the code.
 

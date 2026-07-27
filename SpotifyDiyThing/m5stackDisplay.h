@@ -1,33 +1,17 @@
+// M5Stack Core Basic (320x240 ILI9341) — layout adapted from the Cheap Yellow Display.
+// Buttons: A=prev (GPIO39), B=play/pause (GPIO38), C=next (GPIO37)
+
 #include "spotifyDisplay.h"
 
-#include "touchScreen.h"
-
 #include <TFT_eSPI.h>
-// A library for checking if the reset button has been pressed twice
-// Can be used to enable config mode
-// Can be installed from the library manager (Search for "ESP_DoubleResetDetector")
-// https://github.com/khoih-prog/ESP_DoubleResetDetector
-
+#include <Button2.h>
 #include <JPEGDEC.h>
-// Library for decoding Jpegs from the API responses
-//
-// Can be installed from the library manager (Search for "JPEGDEC")
-// https://github.com/bitbank2/JPEGDEC
-
-// -------------------------------
-// Putting this stuff outside the class because
-// I can't easily pass member functions in as callbacks for jpegdec
-
-// -------------------------------
 
 TFT_eSPI tft = TFT_eSPI();
 JPEGDEC jpeg;
 
 const char *ALBUM_ART = "/album.jpg";
 
-// This next function will be called during decoding of the jpeg file to
-// render each block to the Matrix.  If you use a different display
-// you will need to adapt this function to suit.
 int JPEGDraw(JPEGDRAW *pDraw)
 {
   // Stop further decoding as image is running off bottom of screen
@@ -64,90 +48,146 @@ int32_t mySeek(JPEGFILE *handle, int32_t position)
   return myfile.seek(position);
 }
 
-class CheapYellowDisplay : public SpotifyDisplay
+// ---- Buttons: A=prev, B=play/pause, C=next ----
+// GPIO 34-39 are input-only with no internal pull resistor; M5Stack's PCB
+// provides the external pull-up, so plain INPUT (not INPUT_PULLUP) is correct.
+#define M5_BTN_A_PIN 39
+#define M5_BTN_B_PIN 38
+#define M5_BTN_C_PIN 37
+
+Button2 btnA(M5_BTN_A_PIN, INPUT);
+Button2 btnB(M5_BTN_B_PIN, INPUT);
+Button2 btnC(M5_BTN_C_PIN, INPUT);
+
+static bool s_prevTriggered = false;
+static bool s_playPauseTriggered = false;
+static bool s_nextTriggered = false;
+
+extern bool spotifyIsPlaying;
+
+// ---- Layout (320 x 240, same as CYD) ----
+#define PROGRESS_BAR_Y (150 + 5)
+#define PROGRESS_BAR_H 20
+#define TEXT_START_Y (150 + 30)
+#define TEXT_LINE_H 18
+
+// Button hint row along the bottom edge, above the physical A/B/C buttons.
+// Fits in the few spare pixels below CYD's text block (last line ends ~232).
+#define BTN_ROW_H 6
+#define BTN_ROW_Y (240 - BTN_ROW_H)
+#define BTN_ZONE_W (320 / 3)
+#define BTN_ZONE_MARGIN 6
+
+class M5StackDisplay : public SpotifyDisplay
 {
 public:
   void displaySetup(SpotifyArduino *spotifyObj)
   {
-
     spotify_display = spotifyObj;
 
-    touchSetup(spotifyObj);
-
-    Serial.println("cyd display setup");
+    Serial.println("m5stack display setup");
     setWidth(320);
     setHeight(240);
 
     setImageHeight(150);
     setImageWidth(150);
 
-    // Start the tft display and set it to black
     tft.init();
     tft.setRotation(1);
     tft.fillScreen(TFT_BLACK);
+    // M5Stack's ILI9341 panel needs colours inverted; re-apply explicitly since
+    // the driver sends INVON only once during init and some panels need it twice.
+    tft.invertDisplay(true);
+
+    // setPressedHandler fires on press-down, not after release — important
+    // because updateCurrentlyPlaying() blocks for several seconds and
+    // setClickHandler would miss a press made during that window.
+    btnA.setPressedHandler([](Button2 &) { s_prevTriggered = true; });
+    btnB.setPressedHandler([](Button2 &) { s_playPauseTriggered = true; });
+    btnC.setPressedHandler([](Button2 &) { s_nextTriggered = true; });
   }
 
   void showDefaultScreen()
   {
     tft.fillScreen(TFT_BLACK);
-
-    drawTouchButtons(false, false);
+    drawButtonRow(false, false, false);
   }
 
   void displayTrackProgress(long progress, long duration)
   {
-
-    //  Serial.print("Elapsed time of song (ms): ");
-    //  Serial.print(progress);
-    //  Serial.print(" of ");
-    //  Serial.println(duration);
-    //  Serial.println();
-
     float percentage = ((float)progress / (float)duration) * 100;
     int clampedPercentage = (int)percentage;
-    // Serial.println(clampedPercentage);
     int barXWidth = map(clampedPercentage, 0, 100, 0, screenWidth - 40);
-    // Serial.println(barXWidth);
-
-    int progressStartY = 150 + 5;
 
     // Draw outer Rectangle, in theory we only need to do this once!
-    tft.drawRect(19, progressStartY, screenWidth - 38, 20, TFT_WHITE);
+    tft.drawRect(19, PROGRESS_BAR_Y, screenWidth - 38, PROGRESS_BAR_H, TFT_WHITE);
 
     // Draw the white portion of the filled bar
-    tft.fillRect(20, progressStartY + 1, barXWidth, 18, TFT_WHITE);
+    tft.fillRect(20, PROGRESS_BAR_Y + 1, barXWidth, PROGRESS_BAR_H - 2, TFT_WHITE);
 
     // Fill whats left black
-    tft.fillRect(20 + barXWidth, progressStartY + 1, (screenWidth - 20) - (20 + barXWidth), 18, TFT_BLACK);
+    tft.fillRect(20 + barXWidth, PROGRESS_BAR_Y + 1, (screenWidth - 20) - (20 + barXWidth), PROGRESS_BAR_H - 2, TFT_BLACK);
   }
 
   void printCurrentlyPlayingToScreen(CurrentlyPlaying currentlyPlaying)
   {
-    // Clear the text
-    int textStartY = 150 + 30;
-    tft.fillRect(0, textStartY, screenWidth, screenHeight - textStartY, TFT_BLACK);
+    // Clear the text (stop above the button hint row, unlike CYD which has no such row)
+    int textAreaHeight = BTN_ROW_Y - TEXT_START_Y;
+    tft.fillRect(0, TEXT_START_Y, screenWidth, textAreaHeight, TFT_BLACK);
 
-    tft.drawCentreString(currentlyPlaying.trackName, screenCenterX, textStartY, 2);
-    tft.drawCentreString(currentlyPlaying.artists[0].artistName, screenCenterX, textStartY + 18, 2);
-    tft.drawCentreString(currentlyPlaying.albumName, screenCenterX, textStartY + 36, 2);
+    tft.drawCentreString(currentlyPlaying.trackName, screenCenterX, TEXT_START_Y, 2);
+    tft.drawCentreString(currentlyPlaying.artists[0].artistName, screenCenterX, TEXT_START_Y + TEXT_LINE_H, 2);
+    tft.drawCentreString(currentlyPlaying.albumName, screenCenterX, TEXT_START_Y + (TEXT_LINE_H * 2), 2);
   }
 
   void checkForInput()
   {
-    if (millis() > touchScreenCoolDownTime && handleTouched())
+    btnA.loop();
+    btnB.loop();
+    btnC.loop();
+
+    if (s_prevTriggered)
     {
-      drawTouchButtons(previousTrackStatus, nextTrackStatus);
-      if (previousTrackStatus)
+      s_prevTriggered = false;
+      drawButtonRow(true, false, false);
+      Serial.println("BTN A: previous track");
+      int result = spotify_display->previousTrack();
+      Serial.print("previousTrack HTTP: ");
+      Serial.println(result);
+      drawButtonRow(false, false, false);
+      requestDueTime = 0;
+    }
+    if (s_playPauseTriggered)
+    {
+      s_playPauseTriggered = false;
+      drawButtonRow(false, true, false);
+      int result;
+      if (spotifyIsPlaying)
       {
-        spotify_display->previousTrack();
+        Serial.println("BTN B: pause");
+        result = spotify_display->pause();
       }
-      else if (nextTrackStatus)
+      else
       {
-        spotify_display->nextTrack();
+        Serial.println("BTN B: play");
+        result = spotify_display->play();
       }
-      drawTouchButtons(false, false);
-      requestDueTime = 0;                                               // Some button has been pressed and acted on, it surely impacts the status so force a refresh
-      touchScreenCoolDownTime = millis() + touchScreenCoolDownInterval; // Cool the touch off
+      Serial.print("playback HTTP: ");
+      Serial.println(result);
+      spotifyIsPlaying = !spotifyIsPlaying;
+      drawButtonRow(false, false, false);
+      requestDueTime = 0;
+    }
+    if (s_nextTriggered)
+    {
+      s_nextTriggered = false;
+      drawButtonRow(false, false, true);
+      Serial.println("BTN C: next track");
+      int result = spotify_display->nextTrack();
+      Serial.print("nextTrack HTTP: ");
+      Serial.println(result);
+      drawButtonRow(false, false, false);
+      requestDueTime = 0;
     }
   }
 
@@ -188,19 +228,9 @@ public:
     return imageStatus;
   }
 
-  // NFC tag messages
-  void markDisplayAsTagRead()
-  {
-    int imagePosition = screenCenterX - (imageWidth / 2);
-    tft.drawRect(imagePosition, 0, imageWidth, imageHeight, TFT_BLUE);
-    tft.drawRect(imagePosition + 2, 2, imageWidth - 4, imageHeight - 4, TFT_RED);
-  }
-  void markDisplayAsTagWritten()
-  {
-    int imagePosition = screenCenterX - (imageWidth / 2);
-    tft.drawRect(imagePosition, 0, imageWidth, imageHeight, TFT_RED);
-    tft.drawRect(imagePosition + 2, 2, imageWidth - 4, imageHeight - 4, TFT_GREEN);
-  }
+  // NFC is not wired on M5Stack Core Basic — stubs satisfy the interface
+  void markDisplayAsTagRead() {}
+  void markDisplayAsTagWritten() {}
 
   void drawWifiManagerMessage(WiFiManager *myWiFiManager)
   {
@@ -240,12 +270,24 @@ public:
   }
 
 private:
-  unsigned long touchScreenCoolDownInterval = 200; // How long after a touch press do we accept another (0.2 seconds). There is also an APi request inbetween
-  unsigned long touchScreenCoolDownTime;           // time when cool down has expired
+  // Draws the three button-hint zones along the bottom edge, above the physical
+  // A/B/C buttons. The active zone flashes green for the duration of its API call.
+  void drawButtonRow(bool aActive, bool bActive, bool cActive)
+  {
+    drawButtonZone(0, aActive);
+    drawButtonZone(1, bActive);
+    drawButtonZone(2, cActive);
+  }
+
+  void drawButtonZone(int zoneIndex, bool active)
+  {
+    int x0 = (zoneIndex * BTN_ZONE_W) + BTN_ZONE_MARGIN;
+    int w = BTN_ZONE_W - (BTN_ZONE_MARGIN * 2);
+    tft.fillRect(x0, BTN_ROW_Y, w, BTN_ROW_H, active ? TFT_GREEN : TFT_DARKGREY);
+  }
 
   int displayImageUsingFile(char *albumArtUrl)
   {
-
     // In this example I reuse the same filename
     // over and over, maybe saving the art using
     // the album URI as the name would be better
@@ -269,7 +311,7 @@ private:
     bool gotImage = spotify_display->getImage(albumArtUrl, &f);
 
     // WiFiClientSecure::connect() doesn't stop() a still-open session before
-    // reusing it, so without this a touch press right after an image download
+    // reusing it, so without this a button press right after an image download
     // can hit the API host mid-teardown and fail with "connection reset" (-80).
     client.stop();
 
@@ -298,49 +340,10 @@ private:
     int imagePosition = screenCenterX - (imageWidth / 2);
     // decode will return 1 on sucess and 0 on a failure
     int decodeStatus = jpeg.decode(imagePosition, 0, JPEG_SCALE_HALF);
-    // jpeg.decode(45, 0, 0);
     jpeg.close();
     Serial.print("Time taken to decode and display Image (ms): ");
     Serial.println(millis() - lTime);
 
     return decodeStatus;
-  }
-
-  void drawTouchButtons(bool backStatus, bool forwardStatus)
-  {
-
-    int buttonCenterY = 75;
-    int leftButtonCenterX = 40;
-    int rightButtonCenterX = screenWidth - leftButtonCenterX;
-
-    // Draw back Button
-    tft.fillCircle(leftButtonCenterX, buttonCenterY, 16, TFT_BLACK);
-    tft.drawCircle(leftButtonCenterX, buttonCenterY, 16, TFT_WHITE);
-    if (backStatus)
-    {
-      tft.fillCircle(leftButtonCenterX, buttonCenterY, 15, TFT_GREEN);
-    }
-    else
-    {
-      tft.drawCircle(leftButtonCenterX, buttonCenterY, 15, TFT_WHITE);
-    }
-
-    tft.fillTriangle(leftButtonCenterX - 4, buttonCenterY, leftButtonCenterX + 6, buttonCenterY - 10, leftButtonCenterX + 6, buttonCenterY + 10, TFT_WHITE);
-    tft.drawRect(leftButtonCenterX - 6, buttonCenterY - 10, 2, 20, TFT_WHITE);
-
-    // Draw forward Button
-    tft.fillCircle(rightButtonCenterX, buttonCenterY, 16, TFT_BLACK);
-    tft.drawCircle(rightButtonCenterX, buttonCenterY, 16, TFT_WHITE);
-    if (forwardStatus)
-    {
-      tft.fillCircle(rightButtonCenterX, buttonCenterY, 15, TFT_GREEN);
-    }
-    else
-    {
-      tft.drawCircle(rightButtonCenterX, buttonCenterY, 15, TFT_WHITE);
-    }
-
-    tft.fillTriangle(rightButtonCenterX + 4, buttonCenterY, rightButtonCenterX - 6, buttonCenterY - 10, rightButtonCenterX - 6, buttonCenterY + 10, TFT_WHITE);
-    tft.drawRect(rightButtonCenterX + 6, buttonCenterY - 10, 2, 20, TFT_WHITE);
   }
 };

@@ -233,6 +233,11 @@ class MatrixDisplay: public SpotifyDisplay {
       client.setCACert(spotify_image_server_cert);
       bool gotImage = spotify_display->getImage(albumArtUrl, &f);
 
+      // WiFiClientSecure::connect() doesn't stop() a still-open session before
+      // reusing it, so without this the next request can hit the API host
+      // mid-teardown and fail with "connection reset" (-80).
+      client.stop();
+
       // Swapping back to the main spotify cert
       client.setCACert(spotify_server_cert);
 
